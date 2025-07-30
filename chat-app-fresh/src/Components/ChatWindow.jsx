@@ -300,7 +300,11 @@ const ChatWindow = ({ selectedContact, onContactSelect }) => {
                   />
                   {/* Show reaction indicator if message has reactions */}
                   {message.reactions && message.reactions.length > 0 && (
-                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <div className={`mt-1 text-xs font-medium ${
+                      message.senderId === userData?.id 
+                        ? "text-blue-100 dark:text-blue-200" 
+                        : "text-gray-600 dark:text-gray-300"
+                    }`}>
                       💬 Reacted
                     </div>
                   )}
