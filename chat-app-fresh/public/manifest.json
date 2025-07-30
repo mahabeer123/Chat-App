@@ -1,0 +1,27 @@
+{
+  "name": "Chat App",
+  "short_name": "ChatApp",
+  "description": "A modern chat application with real-time messaging",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#04a784",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-144x144.svg",
+      "sizes": "144x144",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.svg",
+      "sizes": "144x144",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["social", "communication"],
+  "lang": "en",
+  "dir": "ltr"
+} 
