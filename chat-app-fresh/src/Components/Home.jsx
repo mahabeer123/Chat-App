@@ -5,12 +5,17 @@ import ChatWindow from "./ChatWindow";
 import Profile from "./Profile";
 import ThemeToggle from "./ThemeToggle";
 import { logger } from "../utils/logger";
+import { useSelector } from "react-redux";
 
 const Home = () => {
   const { userData, logout } = useAuth();
+  const unreadCounts = useSelector(state => state.chat.unreadCounts);
   const [selectedContact, setSelectedContact] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Calculate total unread messages
+  const totalUnreadMessages = Object.values(unreadCounts).reduce((total, count) => total + count, 0);
 
   useEffect(() => {
     // Simulate loading
@@ -70,6 +75,15 @@ const Home = () => {
           </div>
           
           <div className="flex items-center space-x-3">
+            {/* Total Unread Messages Badge */}
+            {totalUnreadMessages > 0 && (
+              <div className="relative">
+                <div className="bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-semibold">
+                  {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              </div>
+            )}
             <button
               onClick={() => setShowProfile(true)}
               className="p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"

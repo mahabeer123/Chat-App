@@ -4,9 +4,13 @@ import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import UserCard from "./userCard";
 import { logger } from "../utils/logger";
+import { useDispatch, useSelector } from "react-redux";
+import { incrementUnreadCount, clearUnreadCount, setUnreadCount } from "../store/slices/chatSlice";
 
 const ChatPanel = ({ selectedContact, onContactSelect }) => {
   const { userData, setUserData } = useAuth();
+  const dispatch = useDispatch();
+  const unreadCounts = useSelector(state => state.chat.unreadCounts);
   const [contacts, setContacts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -44,11 +48,63 @@ const ChatPanel = ({ selectedContact, onContactSelect }) => {
     });
   }, [filteredContacts]);
 
+  // Add unread counts to contacts
+  const contactsWithUnreadCounts = useMemo(() => {
+    return sortedContacts.map(contact => ({
+      ...contact,
+      unreadCount: unreadCounts[contact.id] || 0
+    }));
+  }, [sortedContacts, unreadCounts]);
+
   useEffect(() => {
     if (userData?.contacts) {
       setContacts(userData.contacts);
     }
   }, [userData?.contacts]);
+
+  // Initialize unread counts for all contacts
+  useEffect(() => {
+    if (!userData?.contacts || userData.contacts.length === 0) return;
+
+    const initializeUnreadCounts = async () => {
+      try {
+        for (const contact of userData.contacts) {
+          const chatId = [userData.id, contact.id].sort().join("_");
+          const messagesRef = collection(db, "chats", chatId, "messages");
+          const q = query(messagesRef, orderBy("timestamp", "desc"), limit(10));
+          
+          const snapshot = await getDocs(q);
+          let unreadCount = 0;
+          
+          snapshot.docs.forEach(doc => {
+            const message = doc.data();
+            // Count messages from this contact that are recent (within last hour)
+            // and not from the current user
+            if (message.senderId === contact.id && 
+                message.senderId !== userData.id &&
+                message.timestamp) {
+              const messageTime = message.timestamp?.toDate?.()?.getTime() || message.timestamp;
+              const currentTime = Date.now();
+              const timeDiff = currentTime - messageTime;
+              
+              // Only count messages from the last hour as unread
+              if (timeDiff < 3600000) {
+                unreadCount++;
+              }
+            }
+          });
+          
+          if (unreadCount > 0) {
+            dispatch(setUnreadCount({ contactId: contact.id, count: unreadCount }));
+          }
+        }
+      } catch (error) {
+        logger.error("Error initializing unread counts:", error);
+      }
+    };
+
+    initializeUnreadCounts();
+  }, [userData?.contacts, userData?.id, dispatch]);
 
   const updateContact = useCallback((contactId, updatedData) => {
     setContacts(prevContacts => {
@@ -72,10 +128,15 @@ const ChatPanel = ({ selectedContact, onContactSelect }) => {
   }, []);
 
   const handleContactSelect = useCallback((contact) => {
+    // Clear unread count when contact is selected
+    if (contact && contact.id) {
+      dispatch(clearUnreadCount({ contactId: contact.id }));
+    }
+    
     if (onContactSelect) {
       onContactSelect(contact);
     }
-  }, [onContactSelect]);
+  }, [onContactSelect, dispatch]);
 
   useEffect(() => {
     if (!userData?.contacts || userData.contacts.length === 0) return;
@@ -129,6 +190,27 @@ const ChatPanel = ({ selectedContact, onContactSelect }) => {
         if (!snapshot.empty) {
           const lastMessage = snapshot.docs[0].data();
           const lastMessageTime = lastMessage.timestamp?.toDate?.()?.getTime() || lastMessage.timestamp;
+          
+          // Check if this is a new message from someone else
+          if (lastMessage.senderId !== userData.id && lastMessage.timestamp) {
+            const messageTime = lastMessage.timestamp?.toDate?.()?.getTime() || lastMessage.timestamp;
+            const currentTime = Date.now();
+            const timeDiff = currentTime - messageTime;
+            
+            // Only increment unread count if:
+            // 1. Message is recent (within last 10 minutes)
+            // 2. Current chat is not with this contact
+            // 3. Message hasn't been processed before (check by timestamp)
+            if (timeDiff < 600000 && selectedContact?.id !== contact.id) {
+              // Check if we've already processed this message
+              const lastProcessedTime = localStorage.getItem(`lastProcessed_${contact.id}`);
+              if (!lastProcessedTime || parseInt(lastProcessedTime) < messageTime) {
+                dispatch(incrementUnreadCount({ contactId: contact.id }));
+                localStorage.setItem(`lastProcessed_${contact.id}`, messageTime.toString());
+              }
+            }
+          }
+          
           if (messageUpdateThrottles.has(contact.id)) {
             clearTimeout(messageUpdateThrottles.get(contact.id));
           }
@@ -151,7 +233,7 @@ const ChatPanel = ({ selectedContact, onContactSelect }) => {
       unsubscribes.forEach(unsubscribe => unsubscribe());
       messageUpdateThrottles.forEach(timeout => clearTimeout(timeout));
     };
-  }, [contacts, userData?.id]);
+  }, [contacts, userData?.id, selectedContact?.id, dispatch]);
 
   const handleAddContact = async () => {
     if (!newContactEmail.trim()) {
@@ -280,8 +362,8 @@ const ChatPanel = ({ selectedContact, onContactSelect }) => {
 
       {/* Contact List */}
       <div className="flex-1 overflow-y-auto space-y-1 p-2">
-        {sortedContacts.length > 0 ? (
-          sortedContacts.map((contact) => (
+        {contactsWithUnreadCounts.length > 0 ? (
+          contactsWithUnreadCounts.map((contact) => (
             <div key={`${contact.id}-${contact.lastUpdated?.seconds || contact.profileUpdatedAt?.seconds || 'stable'}`} className="transition-all duration-200 ease-in-out">
               <UserCard
                 key={`${contact.id}-${contact.lastUpdated?.seconds || contact.profileUpdatedAt?.seconds || 'stable'}`}

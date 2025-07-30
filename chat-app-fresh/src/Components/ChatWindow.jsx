@@ -6,9 +6,12 @@ import { useAuth } from "./AuthContext";
 import { logger } from "../utils/logger";
 import MessageReactions from "./MessageReactions";
 import MessageActions from "./MessageActions";
+import { useDispatch } from "react-redux";
+import { clearUnreadCount } from "../store/slices/chatSlice";
 
 const ChatWindow = ({ selectedContact, onContactSelect }) => {
   const { userData } = useAuth();
+  const dispatch = useDispatch();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -26,6 +29,11 @@ const ChatWindow = ({ selectedContact, onContactSelect }) => {
 
   useEffect(() => {
     if (!selectedContact) return;
+
+    // Clear unread count when chat is opened
+    if (selectedContact.id) {
+      dispatch(clearUnreadCount({ contactId: selectedContact.id }));
+    }
 
     const chatId = [userData.id, selectedContact.id].sort().join("_");
     const messagesRef = collection(db, "chats", chatId, "messages");
@@ -45,7 +53,7 @@ const ChatWindow = ({ selectedContact, onContactSelect }) => {
     });
 
     return () => unsubscribe();
-  }, [selectedContact, userData.id]);
+  }, [selectedContact, userData.id, dispatch]);
 
   const markMessagesAsRead = async (messageList) => {
     try {

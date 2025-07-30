@@ -45,6 +45,7 @@ export const sendMessage = createAsyncThunk(
         time: timeStamp,
         sender: senderId,
         receiver: receiverId,
+        timestamp: date.getTime(),
       };
 
       const docRef = doc(db, "user-chats", chatId);
@@ -76,7 +77,7 @@ const initialState = {
   chatParticipants: {},
   loading: false,
   error: null,
-  unreadCount: 0,
+  unreadCounts: {}, // Track unread counts per contact
   typingUsers: {},
 };
 
@@ -104,11 +105,29 @@ const chatSlice = createSlice({
         delete state.typingUsers[userId];
       }
     },
+    // Increment unread count for a specific contact
     incrementUnreadCount: (state, action) => {
-      state.unreadCount += 1;
+      const { contactId } = action.payload;
+      if (!state.unreadCounts[contactId]) {
+        state.unreadCounts[contactId] = 0;
+      }
+      state.unreadCounts[contactId] += 1;
     },
-    clearUnreadCount: (state) => {
-      state.unreadCount = 0;
+    // Clear unread count for a specific contact
+    clearUnreadCount: (state, action) => {
+      const { contactId } = action.payload;
+      if (state.unreadCounts[contactId]) {
+        state.unreadCounts[contactId] = 0;
+      }
+    },
+    // Set unread count for a specific contact
+    setUnreadCount: (state, action) => {
+      const { contactId, count } = action.payload;
+      state.unreadCounts[contactId] = count;
+    },
+    // Clear all unread counts
+    clearAllUnreadCounts: (state) => {
+      state.unreadCounts = {};
     },
     clearError: (state) => {
       state.error = null;
@@ -156,6 +175,8 @@ export const {
   setTypingUser,
   incrementUnreadCount,
   clearUnreadCount,
+  setUnreadCount,
+  clearAllUnreadCounts,
   clearError,
   clearChat,
 } = chatSlice.actions;
